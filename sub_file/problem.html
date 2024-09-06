@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題表示サイト</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .tab { overflow: hidden; border: 1px solid #ccc; background-color: #f1f1f1; }
+        .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; transition: 0.3s; }
+        .tab button:hover { background-color: #ddd; }
+        .tab button.active { background-color: #ccc; }
+        .tabcontent { display: none; padding: 6px 12px; border: 1px solid #ccc; border-top: none; }
+        button { margin: 10px 0; }
+        #questionList { margin-top: 20px; }
+        .questionItem { margin-bottom: 10px; }
+        #currentQuestion, #result { margin: 10px 0; font-weight: bold; }
+        #stats { margin-top: 20px; font-weight: bold; }
+        .subject-tab { display: inline-block; margin-right: 10px; cursor: pointer; padding: 5px 10px; border: 1px solid #ccc; }
+        .subject-tab.active { background-color: #ddd; }
+        #subjectSelector { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>問題表示サイト</h1>
+    
+    <div id="stats"></div>
+
+    <div class="tab">
+        <button class="tablinks" onclick="openTab(event, 'AddQuestion')" id="defaultOpen">問題を追加</button>
+        <button class="tablinks" onclick="openTab(event, 'QuestionList')">問題リスト</button>
+        <button class="tablinks" onclick="openTab(event, 'SolveQuestion')">問題を解く</button>
+    </div>
+
+    <div id="AddQuestion" class="tabcontent">
+        <h2>問題の追加</h2>
+        <input type="text" id="newSubject" placeholder="教科">
+        <input type="text" id="newQuestion" placeholder="新しい問題">
+        <input type="text" id="newAnswer" placeholder="答え">
+        <button onclick="addQuestion()">問題を追加</button>
+    </div>
+
+    <div id="QuestionList" class="tabcontent">
+        <h2>問題リスト</h2>
+        <div id="subjectTabs"></div>
+        <div id="questionList"></div>
+    </div>
+
+    <div id="SolveQuestion" class="tabcontent">
+        <h2>問題を解く</h2>
+        <div id="subjectSelector">
+            <label><input type="checkbox" id="allSubjects" checked> すべての教科</label>
+            <div id="subjectCheckboxes"></div>
+        </div>
+        <div id="currentQuestion"></div>
+        <input type="text" id="userAnswer" placeholder="回答を入力">
+        <button onclick="checkAnswer()">回答を確認</button>
+        <div id="result"></div>
+        <button onclick="nextQuestion()" id="nextButton">次の問題</button>
+    </div>
+
+    <script>
+        let questions = JSON.parse(localStorage.getItem('questions')) || [];
+        let currentQuestionIndex = -1;
+        let stats = JSON.parse(localStorage.getItem('stats')) || { totalAnswered: 0, correctAnswers: 0 };
+        let currentSubject = 'all';
+        let selectedSubjects = [];
+
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+            if (tabName === 'SolveQuestion') {
+                updateSubjectSelector();
+                nextQuestion();
+            } else if (tabName === 'QuestionList') {
+                updateSubjectTabs();
+                showQuestionList('all');
+            }
+        }
+
+        document.getElementById("defaultOpen").click();
+
+        function addQuestion() {
+            const subject = document.getElementById('newSubject').value;
+            const question = document.getElementById('newQuestion').value;
+            const answer = document.getElementById('newAnswer').value;
+            if (subject && question && answer) {
+                questions.push({ subject, question, answer, active: true });
+                saveQuestions();
+                document.getElementById('newSubject').value = '';
+                document.getElementById('newQuestion').value = '';
+                document.getElementById('newAnswer').value = '';
+                updateSubjectTabs();
+            }
+        }
+
+        function saveQuestions() {
+            localStorage.setItem('questions', JSON.stringify(questions));
+        }
+
+        function saveStats() {
+            localStorage.setItem('stats', JSON.stringify(stats));
+        }
+
+        function updateSubjectTabs() {
+            const subjects = [...new Set(questions.map(q => q.subject))];
+            const tabsContainer = document.getElementById('subjectTabs');
+            tabsContainer.innerHTML = '<span class="subject-tab active" onclick="showQuestionList(\'all\')">すべて</span>';
+            subjects.forEach(subject => {
+                tabsContainer.innerHTML += `<span class="subject-tab" onclick="showQuestionList('${subject}')">${subject}</span>`;
+            });
+        }
+
+        function showQuestionList(subject) {
+            currentSubject = subject;
+            document.querySelectorAll('.subject-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            const list = document.getElementById('questionList');
+            list.innerHTML = '';
+            questions.filter(q => subject === 'all' || q.subject === subject).forEach((q, index) => {
+                const item = document.createElement('div');
+                item.className = 'questionItem';
+                item.innerHTML = `
+                    <input type="checkbox" ${q.active ? 'checked' : ''} onchange="toggleQuestion(${index})">
+                    <span>[${q.subject}] ${q.question} - ${q.answer}</span>
+                    <button onclick="removeQuestion(${index})">削除</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function toggleQuestion(index) {
+            questions[index].active = !questions[index].active;
+            saveQuestions();
+            showQuestionList(currentSubject);
+        }
+
+        function removeQuestion(index) {
+            questions.splice(index, 1);
+            saveQuestions();
+            updateSubjectTabs();
+            showQuestionList(currentSubject);
+        }
+
+        function updateSubjectSelector() {
+            const subjects = [...new Set(questions.map(q => q.subject))];
+            const container = document.getElementById('subjectCheckboxes');
+            container.innerHTML = '';
+            subjects.forEach(subject => {
+                container.innerHTML += `
+                    <label><input type="checkbox" name="subject" value="${subject}" checked> ${subject}</label>
+                `;
+            });
+            document.getElementById('allSubjects').checked = true;
+            selectedSubjects = subjects;
+
+            document.getElementById('allSubjects').addEventListener('change', function() {
+                const subjectCheckboxes = document.querySelectorAll('input[name="subject"]');
+                subjectCheckboxes.forEach(cb => cb.checked = this.checked);
+                updateSelectedSubjects();
+            });
+
+            document.querySelectorAll('input[name="subject"]').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    updateSelectedSubjects();
+                    document.getElementById('allSubjects').checked = selectedSubjects.length === subjects.length;
+                });
+            });
+        }
+
+        function updateSelectedSubjects() {
+            selectedSubjects = Array.from(document.querySelectorAll('input[name="subject"]:checked')).map(cb => cb.value);
+        }
+
+        function nextQuestion() {
+            const activeQuestions = questions.filter(q => q.active && selectedSubjects.includes(q.subject));
+            if (activeQuestions.length === 0) {
+                document.getElementById('currentQuestion').textContent = '選択された教科の有効な問題がありません。';
+                document.getElementById('userAnswer').style.display = 'none';
+                document.getElementById('nextButton').style.display = 'none';
+                return;
+            }
+            currentQuestionIndex = Math.floor(Math.random() * activeQuestions.length);
+            const selectedQuestion = activeQuestions[currentQuestionIndex];
+            document.getElementById('currentQuestion').textContent = `[${selectedQuestion.subject}] 問題: ${selectedQuestion.question}`;
+            document.getElementById('userAnswer').value = '';
+            document.getElementById('userAnswer').style.display = 'inline-block';
+            document.getElementById('result').textContent = '';
+            document.getElementById('nextButton').style.display = 'inline-block';
+        }
+
+        function checkAnswer() {
+            const userAnswer = document.getElementById('userAnswer').value;
+            const correctAnswer = questions[currentQuestionIndex].answer;
+            stats.totalAnswered++;
+            if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+                document.getElementById('result').textContent = '正解です！';
+                questions[currentQuestionIndex].active = false;
+                stats.correctAnswers++;
+                saveQuestions();
+                saveStats();
+                updateSubjectTabs();
+                showQuestionList(currentSubject);
+            } else {
+                document.getElementById('result').textContent = `不正解です。正解は: ${correctAnswer}`;
+            }
+            saveStats();
+            updateStats();
+        }
+
+        function updateStats() {
+            const correctRate = stats.totalAnswered > 0 
+                ? (stats.correctAnswers / stats.totalAnswered * 100).toFixed(2) 
+                : 0;
+            document.getElementById('stats').textContent = `正答率: ${correctRate}% (${stats.correctAnswers}/${stats.totalAnswered})`;
+        }
+
+        updateStats();
+        updateSubjectTabs();
+        showQuestionList('all');
+    </script>
+    
+</body>
+</html>
