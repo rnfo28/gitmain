@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>給料および所得目安計算</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .salary-inputs {
+            display: flex;
+            justify-content: space-between;
+        }
+        .year-column {
+            width: 48%;
+        }
+        input {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+        #result {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .annual-income {
+            display: flex;
+            align-items: center;
+        }
+        .annual-income input {
+            width: 100px;
+            margin-left: 10px;
+            margin-right: 5px;
+        }
+        .year-total {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>給料および所得目安計算</h1>
+        <div class="annual-income">
+            <label for="annualIncome">年間所得目安:</label>
+            <input type="number" id="annualIncome" placeholder="入力">
+            <span>万円</span>
+        </div>
+    </div>
+    <div class="salary-inputs">
+        <div class="year-column">
+            <h2>昨年の給料</h2>
+            <div id="lastYearInputs"></div>
+            <div id="lastYearTotal" class="year-total"></div>
+        </div>
+        <div class="year-column">
+            <h2>今年の給料</h2>
+            <div id="thisYearInputs"></div>
+            <div id="thisYearTotal" class="year-total"></div>
+        </div>
+    </div>
+    <div id="result"></div>
+
+    <script>
+        function createInputs(year, containerId) {
+            const container = document.getElementById(containerId);
+            for (let i = 0; i < 12; i++) {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.placeholder = `${i + 1}月の給料`;
+                input.id = `${year}-${i}`;
+                input.oninput = function() {
+                    calculateMaxNextMonth();
+                    updateYearTotal(year);
+                    saveSalaryData();
+                };
+                container.appendChild(input);
+            }
+        }
+
+        function updateYearTotal(year) {
+            let total = 0;
+            for (let i = 0; i < 12; i++) {
+                total += parseFloat(document.getElementById(`${year}-${i}`).value) || 0;
+            }
+            document.getElementById(`${year}Total`).textContent = `合計: ${total.toLocaleString()}円`;
+        }
+
+        function calculateMaxNextMonth() {
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const salaries = {
+                lastYear: Array(12).fill(0),
+                thisYear: Array(12).fill(0)
+            };
+
+            // 入力値を取得
+            for (let i = 0; i < 12; i++) {
+                salaries.lastYear[i] = parseFloat(document.getElementById(`lastYear-${i}`).value) || 0;
+                salaries.thisYear[i] = parseFloat(document.getElementById(`thisYear-${i}`).value) || 0;
+            }
+
+            const lastMonthSalary = salaries.thisYear[currentMonth - 1];
+            const thisMonthSalary = salaries.thisYear[currentMonth];
+
+            // 来月から来年の同月までの合計を計算
+            let totalNextYearSameMonth = 0;
+            for (let i = currentMonth + 1; i < 12; i++) {
+                totalNextYearSameMonth += salaries.lastYear[i];
+            }
+            for (let i = 0; i <= currentMonth; i++) {
+                totalNextYearSameMonth += salaries.thisYear[i];
+            }
+
+            const annualIncome = (parseFloat(document.getElementById('annualIncome').value) || 130) * 10000;
+
+            // 条件1: 3ヶ月平均が年間所得目安÷12を超えない
+            const maxForAvg = (annualIncome / 12) * 3 - lastMonthSalary - thisMonthSalary;
+
+            // 条件2: 年間合計が年間所得目安を超えない
+            const maxForTotal = annualIncome - totalNextYearSameMonth;
+
+            // 2つの条件の小さい方を選択
+            const maxAllowed = Math.min(maxForAvg, maxForTotal);
+
+            document.getElementById('result').textContent = `来月の最大収入目安: ${Math.floor(maxAllowed).toLocaleString()}円`;
+        }
+
+        function saveSalaryData() {
+            const salaryData = {
+                lastYear: [],
+                thisYear: [],
+                annualIncome: document.getElementById('annualIncome').value
+            };
+
+            for (let i = 0; i < 12; i++) {
+                salaryData.lastYear.push(document.getElementById(`lastYear-${i}`).value);
+                salaryData.thisYear.push(document.getElementById(`thisYear-${i}`).value);
+            }
+
+            localStorage.setItem('salaryData', JSON.stringify(salaryData));
+        }
+
+        function loadSalaryData() {
+            const savedData = localStorage.getItem('salaryData');
+            if (savedData) {
+                const salaryData = JSON.parse(savedData);
+                for (let i = 0; i < 12; i++) {
+                    document.getElementById(`lastYear-${i}`).value = salaryData.lastYear[i] || '';
+                    document.getElementById(`thisYear-${i}`).value = salaryData.thisYear[i] || '';
+                }
+                document.getElementById('annualIncome').value = salaryData.annualIncome || '';
+                updateYearTotal('lastYear');
+                updateYearTotal('thisYear');
+                calculateMaxNextMonth();
+            }
+        }
+
+        createInputs('lastYear', 'lastYearInputs');
+        createInputs('thisYear', 'thisYearInputs');
+        document.getElementById('annualIncome').oninput = function() {
+            calculateMaxNextMonth();
+            saveSalaryData();
+        };
+        loadSalaryData();
+    </script>
+</body>
+</html>
