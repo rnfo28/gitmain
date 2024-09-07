@@ -297,8 +297,8 @@
 英語,What is "Hello" in Japanese?,こんにちは
 理科,太陽系で最も大きな惑星は？,木星`;
             
-            console.log('CSVデータ:', sampleCSVData);
-            const lines = sampleCSVData.split('\n').filter(line => line.trim() !== '');
+            console.log('CSVデータ:', fetch('data.csv'));
+            const lines = fetch('data.csv').split('\n').filter(line => line.trim() !== '');
             console.log('行数:', lines.length);
             
             csvQuestions = lines.map(line => {
