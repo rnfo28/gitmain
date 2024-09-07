@@ -309,29 +309,47 @@
             });
         }
 
-        function loadCSV() {
-            console.log('CSVファイルの読み込みを開始します');
-            // ここでは、実際のCSVファイルの代わりにサンプルデータを使用します
-            const sampleCSVData = fetch('data.csv')
-            
-            console.log('CSVデータ:', sampleCSVData);
-            const lines = sampleCSVData.split('\n').filter(line => line.trim() !== '');
-            console.log('行数:', lines.length);
-            
-            csvQuestions = lines.map(line => {
-                const items = line.split(',').map(item => item.trim());
-                if (items.length === 3) {
-                    const [subject, question, answer] = items;
-                    return { subject, question, answer, active: true };
-                } else {
-                    console.warn('不正な行:', line);
-                    return null;
-                }
-            }).filter(q => q);
-            
-            console.log('解析された問題数:', csvQuestions.length);
-            displayCSVQuestions();
+       async function loadCSV() {
+    console.log('CSVファイルの読み込みを開始します');
+
+    try {
+        // 非同期処理の完了を待つ
+        const response = await fetch('data.csv');
+
+        // fetch が成功した場合のみ実行
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        // テキストデータとしてCSVを取得
+        const sampleCSVData = await response.text();
+
+        console.log('CSVデータ:', sampleCSVData);
+
+        // CSVデータを行ごとに分割し、空行を除去
+        const lines = sampleCSVData.split('\n').filter(line => line.trim() !== '');
+        console.log('行数:', lines.length);
+
+        // CSVデータを解析し、問題リストに変換
+        csvQuestions = lines.map(line => {
+            const items = line.split(',').map(item => item.trim());
+            if (items.length === 3) {
+                const [subject, question, answer] = items;
+                return { subject, question, answer, active: true };
+            } else {
+                console.warn('不正な行:', line);
+                return null;
+            }
+        }).filter(q => q); // null を除外
+
+        console.log('解析された問題数:', csvQuestions.length);
+
+        // CSVから読み込んだ問題を表示
+        displayCSVQuestions();
+    } catch (error) {
+        console.error('CSVファイルの読み込み中にエラーが発生しました:', error);
+    }
+}
 
         function displayCSVQuestions() {
             const container = document.getElementById('csvQuestions');
