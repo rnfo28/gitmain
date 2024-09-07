@@ -63,6 +63,7 @@
         <div id="ImportedQuestions" class="questiontabcontent">
             <div id="importedSubjectTabs"></div>
             <div id="importedQuestionList"></div>
+            <div id="csvQuestions"></div>
         </div>
     </div>
 
@@ -289,7 +290,9 @@
             document.getElementById('stats').textContent = `正答率: ${correctRate}% (${stats.correctAnswers}/${stats.totalAnswered})`;
         }
 
-        function loadCSV() {
+        let csvQuestions = [];
+
+function loadCSV() {
     console.log('CSVファイルの読み込みを開始します');
     fetch('data.csv')
         .then(response => {
@@ -321,6 +324,38 @@
             document.getElementById('csvQuestions').innerHTML = 'CSVファイルの読み込みに失敗しました。エラー: ' + error.message;
         });
 }
+
+function displayCSVQuestions() {
+    const container = document.getElementById('csvQuestions');
+    if (csvQuestions.length === 0) {
+        container.innerHTML = 'CSVから読み込んだ問題はありません。';
+        return;
+    }
+    container.innerHTML = `<h3>CSVファイルからの問題 (合計: ${csvQuestions.length}問)</h3>`;
+    csvQuestions.forEach((q, index) => {
+        const item = document.createElement('div');
+        item.innerHTML = `
+            <input type="checkbox" id="csvQuestion${index}">
+            <label for="csvQuestion${index}">[${q.subject}] ${q.question} - ${q.answer}</label>
+        `;
+        container.appendChild(item);
+    });
+    container.innerHTML += '<button onclick="addSelectedCSVQuestions()">選択した問題を追加</button>';
+}
+
+function addSelectedCSVQuestions() {
+    const selectedQuestions = csvQuestions.filter((_, index) => 
+        document.getElementById(`csvQuestion${index}`).checked
+    );
+    userQuestions.push(...selectedQuestions.map(q => ({ ...q, active: true }))); // CSVからユーザーの問題リストに追加
+    saveQuestions(); // ローカルストレージに保存
+    updateSubjectTabs(userQuestions, 'userSubjectTabs'); // タブの更新
+    showQuestionList(userQuestions, 'userQuestionList', 'all'); // 問題リストの更新
+    document.getElementById('csvQuestions').innerHTML = ''; // CSVの問題をクリア
+}
+
+loadCSV(); // ページ読み込み時にCSVをロード
+
 
 
         function displayCSVQuestions() {
