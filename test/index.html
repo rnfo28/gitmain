@@ -377,15 +377,27 @@ loadCSV(); // ページ読み込み時にCSVをロード
         }
 
         function addSelectedCSVQuestions() {
-            const selectedQuestions = csvQuestions.filter((_, index) => 
-                document.getElementById(`csvQuestion${index}`).checked
-            );
-            questions.push(...selectedQuestions.map(q => ({ ...q, active: true })));
-            saveQuestions();
-            updateSubjectTabs();
-            showQuestionList('all');
-            document.getElementById('csvQuestions').innerHTML = '';
-        }
+    const selectedQuestions = csvQuestions.filter((_, index) => 
+        document.getElementById(`csvQuestion${index}`).checked
+    );
+
+    // デバッグ用: 選択された問題の数をログに出力
+    console.log('選択された問題:', selectedQuestions.length, selectedQuestions);
+
+    if (selectedQuestions.length > 0) {
+        userQuestions.push(...selectedQuestions.map(q => ({ ...q, active: true }))); // CSVからユーザーの問題リストに追加
+        saveQuestions(); // ローカルストレージに保存
+        updateSubjectTabs(userQuestions, 'userSubjectTabs'); // タブの更新
+        showQuestionList(userQuestions, 'userQuestionList', 'all'); // 問題リストの更新
+        document.getElementById('csvQuestions').innerHTML = ''; // CSVの問題をクリア
+
+        // デバッグ用: 追加後の問題リストをログに出力
+        console.log('userQuestions に追加された問題:', userQuestions);
+    } else {
+        console.warn('選択された問題がありません');
+    }
+}
+
 
         updateStats();
         updateSubjectTabs();
