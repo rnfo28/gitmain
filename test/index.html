@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>問題表示サイト v1.01</title>
+    <title>問題表示サイト v1.02</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .tab { overflow: hidden; border: 1px solid #ccc; background-color: #f1f1f1; }
@@ -32,7 +32,7 @@
     </script>
 </head>
 <body>
-    <h1>問題表示サイト <span id="version">v1.01</span></h1>
+    <h1>問題表示サイト <span id="version">v1.02</span></h1>
     
     <div id="stats"></div>
 
@@ -155,6 +155,7 @@
                 document.getElementById('newQuestion').value = '';
                 document.getElementById('newAnswer').value = '';
                 updateSubjectTabs(userQuestions, 'userSubjectTabs');
+                showQuestionList(userQuestions, 'userQuestionList', 'all');
             }
         }
 
@@ -265,17 +266,14 @@
         }
 
         function checkAnswer() {
+            const allQuestions = [...userQuestions, ...importedQuestions];
+            const activeQuestions = allQuestions.filter(q => q.active && selectedSubjects.includes(q.subject));
             const userAnswer = document.getElementById('userAnswer').value;
-            const correctAnswer = questions[currentQuestionIndex].answer;
+            const correctAnswer = activeQuestions[currentQuestionIndex].answer;
             stats.totalAnswered++;
             if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
                 document.getElementById('result').textContent = '正解です！';
-                questions[currentQuestionIndex].active = false;
                 stats.correctAnswers++;
-                saveQuestions();
-                saveStats();
-                updateSubjectTabs();
-                showQuestionList(currentSubject);
             } else {
                 document.getElementById('result').textContent = `不正解です。正解は: ${correctAnswer}`;
             }
@@ -292,136 +290,80 @@
 
         let csvQuestions = [];
 
-function loadCSV() {
-    console.log('CSVファイルの読み込みを開始します');
-    fetch('data.csv')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+        function loadCSV() {
+            console.log('CSVファイルの読み込みを開始します');
+            fetch('data.csv')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    console.log('CSVファイルの取得に成功しました');
+                    return response.text();
+                })
+                .then(data => {
+                    console.log('CSVデータ:', data); // デバッグ用
+                    const lines = data.split('\n').filter(line => line.trim() !== ''); // 空行を除去
+                    console.log('行数:', lines.length);
+                    csvQuestions = lines.map(line => {
+                        const items = line.split(',').map(item => item.trim());
+                        if (items.length === 3) {  // 項目数を確認
+                            const [subject, question, answer] = items;
+                            return { subject, question, answer };
+                        } else {
+                            console.warn('不正な行:', line);
+                            return null; // 無効な行を除外
+                        }
+                    }).filter(q => q); // nullを除外
+                    console.log('解析された問題数:', csvQuestions.length);
+                    displayCSVQuestions();
+                })
+                .catch(error => {
+                    console.error('CSVファイルの読み込み中にエラーが発生しました:', error);
+                    document.getElementById('csvQuestions').innerHTML = 'CSVファイルの読み込みに失敗しました。エラー: ' + error.message;
+                });
+        }
+
+        function displayCSVQuestions() {
+            const container = document.getElementById('csvQuestions');
+            if (csvQuestions.length === 0) {
+                container.innerHTML = 'CSVから読み込んだ問題はありません。';
+                return;
             }
-            console.log('CSVファイルの取得に成功しました');
-            return response.text();
-        })
-        .then(data => {
-            console.log('CSVデータ:', data); // デバッグ用
-            const lines = data.split('\n').filter(line => line.trim() !== ''); // 空行を除去
-            console.log('行数:', lines.length);
-            csvQuestions = lines.map(line => {
-                const items = line.split(',').map(item => item.trim());
-                if (items.length === 3) {  // 項目数を確認
-                    const [subject, question, answer] = items;
-                    return { subject, question, answer };
-                } else {
-                    console.warn('不正な行:', line);
-                    return null; // 無効な行を除外
-                }
-            }).filter(q => q); // nullを除外
-            console.log('解析された問題数:', csvQuestions.length);
-            displayCSVQuestions();
-        })
-        .catch(error => {
-            console.error('CSVファイルの読み込み中にエラーが発生しました:', error);
-            document.getElementById('csvQuestions').innerHTML = 'CSVファイルの読み込みに失敗しました。エラー: ' + error.message;
-        });
-}
-
-function displayCSVQuestions() {
-    const container = document.getElementById('csvQuestions');
-    if (csvQuestions.length === 0) {
-        container.innerHTML = 'CSVから読み込んだ問題はありません。';
-        return;
-    }
-    container.innerHTML = `<h3>CSVファイルからの問題 (合計: ${csvQuestions.length}問)</h3>`;
-    csvQuestions.forEach((q, index) => {
-        const item = document.createElement('div');
-        item.innerHTML = `
-            <input type="checkbox" id="csvQuestion${index}">
-            <label for="csvQuestion${index}">[${q.subject}] ${q.question} - ${q.answer}</label>
-        `;
-        container.appendChild(item);
-    });
-    container.innerHTML += '<button onclick="addSelectedCSVQuestions()">選択した問題を追加</button>';
-}
-
-function addSelectedCSVQuestions() {
-    const selectedQuestions = csvQuestions.filter((_, index) => 
-        document.getElementById(`csvQuestion${index}`).checked
-    );
-    userQuestions.push(...selectedQuestions.map(q => ({ ...q, active: true }))); // CSVからユーザーの問題リストに追加
-    saveQuestions(); // ローカルストレージに保存
-    updateSubjectTabs(userQuestions, 'userSubjectTabs'); // タブの更新
-    showQuestionList(userQuestions, 'userQuestionList', 'all'); // 問題リストの更新
-    document.getElementById('csvQuestions').innerHTML = ''; // CSVの問題をクリア
-}
-
-loadCSV(); // ページ読み込み時にCSVをロード
-
-            function displayCSVQuestions() {
-    const container = document.getElementById('csvQuestions');
-    if (csvQuestions.length === 0) {
-        container.innerHTML = 'CSVから読み込んだ問題はありません。';
-        return;
-    }
-
-    container.innerHTML = `<h3>CSVファイルからの問題 (合計: ${csvQuestions.length}問)</h3>`;
-    csvQuestions.forEach((q, index) => {
-        const item = document.createElement('div');
-        item.innerHTML = `
-            <input type="checkbox" id="csvQuestion${index}">
-            <label for="csvQuestion${index}">[${q.subject}] ${q.question} - ${q.answer}</label>
-        `;
-        container.appendChild(item);
-    });
-
-    // 問題追加後にチェックを外して選択状態をリセット
-    container.innerHTML += '<button onclick="addSelectedCSVQuestions()">選択した問題を追加</button>';
-}
-
-
-    // デバッグ用: 選択された問題の数をログに出力
-    console.log('選択された問題:', selectedQuestions.length, selectedQuestions);
-
-    if (selectedQuestions.length > 0) {
-        userQuestions.push(...selectedQuestions.map(q => ({ ...q, active: true }))); // CSVからユーザーの問題リストに追加
-        saveQuestions(); // ローカルストレージに保存
-        updateSubjectTabs(userQuestions, 'userSubjectTabs'); // タブの更新
-        showQuestionList(userQuestions, 'userQuestionList', 'all'); // 問題リストの更新
+            container.innerHTML = `<h3>CSVファイルからの問題 (合計: ${csvQuestions.length}問)</h3>`;
+            csvQuestions.forEach((q, index) => {
+                const item = document.createElement('div');
+                item.innerHTML = `
+                    <input type="checkbox" id="csvQuestion${index}">
+                    <label for="csvQuestion${index}">[${q.subject}] ${q.question} - ${q.answer}</label>
+                `;
+                container.appendChild(item);
+            });
+            container.innerHTML += '<button onclick="addSelectedCSVQuestions()">選択した問題を追加</button>';
+        }
 
         function addSelectedCSVQuestions() {
-    const selectedQuestions = csvQuestions.filter((_, index) => 
-        document.getElementById(`csvQuestion${index}`).checked
-    );
+            const selectedQuestions = csvQuestions.filter((_, index) => 
+                document.getElementById(`csvQuestion${index}`).checked
+            );
 
-    // デバッグ用: 選択された問題の数をログに出力
-    console.log('選択された問題:', selectedQuestions.length, selectedQuestions);
+            console.log('選択された問題:', selectedQuestions.length, selectedQuestions);
 
-    if (selectedQuestions.length > 0) {
-        userQuestions.push(...selectedQuestions.map(q => ({ ...q, active: true }))); // CSVからユーザーの問題リストに追加
-        saveQuestions(); // ローカルストレージに保存
-        updateSubjectTabs(userQuestions, 'userSubjectTabs'); // タブの更新
-        showQuestionList(userQuestions, 'userQuestionList', 'all'); // 問題リストの更新
+            if (selectedQuestions.length > 0) {
+                importedQuestions.push(...selectedQuestions.map(q => ({ ...q, active: true })));
+                saveQuestions();
+                updateSubjectTabs(importedQuestions, 'importedSubjectTabs');
+                showQuestionList(importedQuestions, 'importedQuestionList', 'all');
 
-        // デバッグ用: 追加後の問題リストをログに出力
-        console.log('userQuestions に追加された問題:', userQuestions);
-
-        // ここでは、問題表示をクリアしないことで、選択が終わってもCSV問題を残す
-    } else {
-        console.warn('選択された問題がありません');
-    }
-}
-
-
-        // デバッグ用: 追加後の問題リストをログに出力
-        console.log('userQuestions に追加された問題:', userQuestions);
-    } else {
-        console.warn('選択された問題がありません');
-    }
-}
-
+                console.log('importedQuestions に追加された問題:', importedQuestions);
+            } else {
+                console.warn('選択された問題がありません');
+            }
+        }
 
         updateStats();
-        updateSubjectTabs();
-        showQuestionList('all');
+        updateSubjectTabs(userQuestions, 'userSubjectTabs');
+        updateSubjectTabs(importedQuestions, 'importedSubjectTabs');
+        showQuestionList(userQuestions, 'userQuestionList', 'all');
         loadCSV();
     </script>
 </body>
