@@ -288,12 +288,33 @@
             document.getElementById('stats').textContent = `正答率: ${correctRate}% (${stats.correctAnswers}/${stats.totalAnswered})`;
         }
 
-        let csvQuestions = [];
+        function showQuestionList(questions, listId, subject) {
+            currentSubject = subject;
+            const tabsContainer = document.querySelector(`#${listId.replace('List', 'Tabs')}`);
+            if (tabsContainer) {
+                tabsContainer.querySelectorAll('.subject-tab').forEach(tab => tab.classList.remove('active'));
+                tabsContainer.querySelector(`.subject-tab[data-subject="${subject}"]`)?.classList.add('active');
+            }
+            const list = document.getElementById(listId);
+            list.innerHTML = '';
+            questions.filter(q => subject === 'all' || q.subject === subject).forEach((q, index) => {
+                const item = document.createElement('div');
+                item.className = 'questionItem';
+                item.innerHTML = `
+                    <input type="checkbox" ${q.active ? 'checked' : ''} onchange="toggleQuestion(${index}, '${currentQuestionSet}')">
+                    <span>[${q.subject}] ${q.question} - ${q.answer}</span>
+                    <button onclick="removeQuestion(${index}, '${currentQuestionSet}')">削除</button>
+                `;
+                list.appendChild(item);
+            });
+        }
 
         function loadCSV() {
             console.log('CSVファイルの読み込みを開始します');
             // ここでは、実際のCSVファイルの代わりにサンプルデータを使用します
-            const sampleCSVData =fetch('data.csv')
+            const sampleCSVData = `数学,2+2は？,4
+英語,What is "Hello" in Japanese?,こんにちは
+理科,太陽系で最も大きな惑星は？,木星`;
             
             console.log('CSVデータ:', sampleCSVData);
             const lines = sampleCSVData.split('\n').filter(line => line.trim() !== '');
@@ -303,7 +324,7 @@
                 const items = line.split(',').map(item => item.trim());
                 if (items.length === 3) {
                     const [subject, question, answer] = items;
-                    return { subject, question, answer };
+                    return { subject, question, answer, active: true };
                 } else {
                     console.warn('不正な行:', line);
                     return null;
@@ -332,7 +353,6 @@
             container.innerHTML += '<button onclick="addSelectedCSVQuestions()">選択した問題を追加</button>';
         }
 
-        // 変更された addSelectedCSVQuestions 関数
         function addSelectedCSVQuestions() {
             const selectedQuestions = csvQuestions.filter((_, index) => 
                 document.getElementById(`csvQuestion${index}`).checked
@@ -341,7 +361,7 @@
             console.log('選択された問題:', selectedQuestions.length, selectedQuestions);
 
             if (selectedQuestions.length > 0) {
-                importedQuestions.push(...selectedQuestions.map(q => ({ ...q, active: true })));
+                importedQuestions.push(...selectedQuestions);
                 saveQuestions();
                 updateSubjectTabs(importedQuestions, 'importedSubjectTabs');
                 showQuestionList(importedQuestions, 'importedQuestionList', 'all');
@@ -351,8 +371,42 @@
                 // 追加：選択をリセットし、CSVの問題リストを更新
                 csvQuestions = csvQuestions.filter((_, index) => !document.getElementById(`csvQuestion${index}`).checked);
                 displayCSVQuestions();
+
+                // インポートタブを表示
+                openQuestionTab(null, 'ImportedQuestions');
             } else {
                 console.warn('選択された問題がありません');
+            }
+        }
+
+        function updateSubjectTabs(questions, tabId) {
+            const subjects = ['all', ...new Set(questions.map(q => q.subject))];
+            const tabsContainer = document.getElementById(tabId);
+            tabsContainer.innerHTML = subjects.map(subject => 
+                `<span class="subject-tab${subject === 'all' ? ' active' : ''}" data-subject="${subject}" onclick="showQuestionList(${currentQuestionSet === 'user' ? 'userQuestions' : 'importedQuestions'}, '${currentQuestionSet === 'user' ? 'userQuestionList' : 'importedQuestionList'}', '${subject}')">${subject === 'all' ? 'すべて' : subject}</span>`
+            ).join('');
+        }
+
+        function openQuestionTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("questiontabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            if (evt) evt.currentTarget.className += " active";
+            if (tabName === 'UserQuestions') {
+                currentQuestionSet = 'user';
+                updateSubjectTabs(userQuestions, 'userSubjectTabs');
+                showQuestionList(userQuestions, 'userQuestionList', 'all');
+            } else if (tabName === 'ImportedQuestions') {
+                currentQuestionSet = 'imported';
+                updateSubjectTabs(importedQuestions, 'importedSubjectTabs');
+                showQuestionList(importedQuestions, 'importedQuestionList', 'all');
             }
         }
 
