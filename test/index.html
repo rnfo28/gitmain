@@ -293,12 +293,10 @@
         function loadCSV() {
             console.log('CSVファイルの読み込みを開始します');
             // ここでは、実際のCSVファイルの代わりにサンプルデータを使用します
-            const sampleCSVData = `数学,2+2は？,4
-英語,What is "Hello" in Japanese?,こんにちは
-理科,太陽系で最も大きな惑星は？,木星`;
+            const sampleCSVData =fetch('data.csv')
             
-            console.log('CSVデータ:', fetch('data.csv'));
-            const lines = fetch('data.csv').split('\n').filter(line => line.trim() !== '');
+            console.log('CSVデータ:', sampleCSVData);
+            const lines = sampleCSVData.split('\n').filter(line => line.trim() !== '');
             console.log('行数:', lines.length);
             
             csvQuestions = lines.map(line => {
